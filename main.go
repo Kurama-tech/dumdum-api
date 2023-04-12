@@ -22,7 +22,8 @@ import (
 
 type User struct {
 	Name  string `json:"name"`
-	Company string `json:"description"`
+	Company string `json:"company"`
+	Avatar string `json:"avatar"`
 	Images []string `bson:"images" json:"images"`
 	Proprietor string `json:"proprietor"`
 	Contact string `json:"contact"`
@@ -36,7 +37,8 @@ type User struct {
 type UserGet struct {
 	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
 	Name  string `json:"name"`
-	Company string `json:"description"`
+	Company string `json:"company"`
+	Avatar string `json:"avatar"`
 	Images []string `bson:"images" json:"images"`
 	Proprietor string `json:"proprietor"`
 	Contact string `json:"contact"`
@@ -289,7 +291,7 @@ func editItem(client *mongo.Client) http.HandlerFunc {
 		// Update the item in the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("users")
 		filter := bson.M{"_id": item.ID}
-		update := bson.M{"$set": bson.M{"name": item.Name, "company":item.Company, "proprietor": item.Proprietor, "status": item.Status, "images": item.Images, "location": item.Location }}
+		update := bson.M{"$set": bson.M{"name": item.Name, "company":item.Company,"avatar": item.Avatar,"proprietor": item.Proprietor, "status": item.Status, "images": item.Images, "location": item.Location }}
 		_, err = collection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
