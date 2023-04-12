@@ -290,7 +290,7 @@ func editItem(client *mongo.Client) http.HandlerFunc {
 		
 		// Update the item in the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("users")
-		filter := bson.M{"_id": item.ID}
+		filter := bson.M{"uid": item.UserId}
 		update := bson.M{"$set": bson.M{"name": item.Name, "company":item.Company,"avatar": item.Avatar,"proprietor": item.Proprietor, "status": item.Status, "images": item.Images, "location": item.Location }}
 		_, err = collection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
@@ -441,12 +441,12 @@ func getItem(client *mongo.Client) http.HandlerFunc {
 		fmt.Println(id)
 		// Get all items from the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("users")
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		cursor, err := collection.Find(context.Background(), bson.M{"_id": oid})
+		// oid, err := primitive.ObjectIDFromHex(id)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+		cursor, err := collection.Find(context.Background(), bson.M{"uid": id})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
