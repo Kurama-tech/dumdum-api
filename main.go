@@ -27,7 +27,7 @@ type User struct {
 	Images []string `bson:"images" json:"images"`
 	Proprietor string `json:"proprietor"`
 	Contact string `json:"contact"`
-	UserId string `json:"uid"`
+	UserId string `json:"userid"`
 	Status string `json:"status"`
 	Location string `json:"location"`
 	BusniessCategory string `json:"busniess_category"`
@@ -42,7 +42,7 @@ type UserGet struct {
 	Images []string `bson:"images" json:"images"`
 	Proprietor string `json:"proprietor"`
 	Contact string `json:"contact"`
-	UserId string `json:"uid"`
+	UserId string `json:"userid"`
 	Status string `json:"status"`
 	Location string `json:"location"`
 	BusniessCategory string `json:"busniess_category"`
@@ -290,7 +290,7 @@ func editItem(client *mongo.Client) http.HandlerFunc {
 		
 		// Update the item in the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("users")
-		filter := bson.M{"uid": item.UserId}
+		filter := bson.M{"userid": item.UserId}
 		update := bson.M{"$set": bson.M{"name": item.Name, "company":item.Company,"avatar": item.Avatar,"proprietor": item.Proprietor, "status": item.Status, "images": item.Images, "location": item.Location }}
 		_, err = collection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
@@ -446,7 +446,7 @@ func getItem(client *mongo.Client) http.HandlerFunc {
 		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
 		// 	return
 		// }
-		cursor, err := collection.Find(context.Background(), bson.M{"uid": id})
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
