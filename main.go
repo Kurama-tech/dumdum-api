@@ -458,6 +458,7 @@ func getItem(client *mongo.Client) http.HandlerFunc {
 		var items []UserGet
 		for cursor.Next(context.Background()) {
 			var item UserGet
+
 			err := cursor.Decode(&item)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -465,6 +466,8 @@ func getItem(client *mongo.Client) http.HandlerFunc {
 			}
 			items = append(items, item)
 		}
+
+		fmt.Println(items)
 		
 		// Send the list of items as a JSON response
 		w.Header().Set("Content-Type", "application/json")
