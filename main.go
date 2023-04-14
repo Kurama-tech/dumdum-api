@@ -185,14 +185,16 @@ func Upload(minioClient *minio.Client) http.HandlerFunc {
             filename := fileHeader.Filename
             extension := filepath.Ext(filename)
 
+			dotRemoved := extension[1:]
+
             // Generate a unique file name with the original extension.
             newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
 			newPath := "http://"+minioURL + "/dumdum/" + newFilename
 			ImagePaths = append(ImagePaths, newPath)
 
             // Upload the file to Minio.
-            _, err = minioClient.PutObject("jwc", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
-				ContentType: "image/png",
+            _, err = minioClient.PutObject("dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
+				ContentType: "image/"+dotRemoved,
 			})
             if err != nil {
 				fmt.Println(err.Error())
