@@ -144,6 +144,8 @@ func main() {
 	// Define a PUT route to edit an item in a collection
 	router.HandleFunc("/api/users/{id}", editItem(client)).Methods("PUT")
 
+	router.HandleFunc("/api/upload/image/{id}", UploadUserImages(minioClient, client)).Methods("POST")
+
 
 	
 	// Start the HTTP server
@@ -152,6 +154,104 @@ func main() {
 	if err != nil {
 		
 		log.Fatal(err)
+	}
+}
+
+func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+
+		err := r.ParseMultipartForm(32 << 20)
+        if err != nil {
+			fmt.Println(err.Error())
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        // Get the file headers from the form.
+        files := r.MultipartForm.File["files"]
+
+		var ImagePaths []string 
+
+        // Loop through the files and upload them to Minio.
+        for _, fileHeader := range files {
+            // Open the file.
+            file, err := fileHeader.Open()
+            if err != nil {
+				fmt.Println(err.Error())
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            defer file.Close()
+
+            // Get the file name and extension.
+            filename := fileHeader.Filename
+            extension := filepath.Ext(filename)
+
+			dotRemoved := extension[1:]
+
+            // Generate a unique file name with the original extension.
+            newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
+			newPath := "http://"+minioURL + "/dumdum/" + newFilename
+			ImagePaths = append(ImagePaths, newPath)
+
+            // Upload the file to Minio.
+            _, err = minioClient.PutObject("dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
+				ContentType: "image/"+dotRemoved,
+			})
+            if err != nil {
+				fmt.Println(err.Error())
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+        }
+
+		collection := client.Database(Database).Collection("users")
+		filter := bson.M{"userid": id}
+		update := bson.M{"$push": bson.M{"images": ImagePaths[0]}}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []UserGet
+		for cursor.Next(context.Background()) {
+			var item UserGet
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+
 	}
 }
 
