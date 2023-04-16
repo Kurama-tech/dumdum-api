@@ -210,6 +210,8 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.Hand
             }
         }
 
+		fmt.Println(ImagePaths)
+
 		collection := client.Database(Database).Collection("users")
 		filter := bson.M{"userid": id}
 		update := bson.M{"$push": bson.M{"images": ImagePaths[0]}}
