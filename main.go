@@ -213,11 +213,13 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.Hand
 		collection := client.Database(Database).Collection("users")
 		filter := bson.M{"userid": id}
 		update := bson.M{"$push": bson.M{"images": ImagePaths[0]}}
-		_, err = collection.UpdateOne(context.Background(), filter, update)
+		result, err := collection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		fmt.Println(result);
 
 
 		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
