@@ -34,6 +34,22 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+type HistoryMessage struct {
+    Message   string    `bson:"message"`
+    Timestamp time.Time `bson:"timestamp"`
+}
+type History struct {
+    UserId    string    `bson:"userid"`
+    Messages  []HistoryMessage    `bson:"messages"`
+}
+
+
+type Connections struct {
+	UserId    string    `bson:"userid"`
+	Contacted int `bson:"contacted"`
+	Connections int `bson:"connections"`
+}
+
 type UserGet struct {
 	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
 	Name  string `json:"name"`
@@ -146,6 +162,15 @@ func main() {
 
 	router.HandleFunc("/api/upload/image/{id}", UploadUserImages(minioClient, client)).Methods("POST")
 
+	router.HandleFunc("/api/add/history/{id}", AddHistoryMessage(client)).Methods("POST")
+
+	router.HandleFunc("/api/list/history/{id}", ListHistory(client)).Methods("GET")
+	router.HandleFunc("/api/list/connections/{id}", ListConnections(client)).Methods("GET")
+
+	router.HandleFunc("/api/increment/connections/{id}", IncrementConnections(client)).Methods("PUT")
+	router.HandleFunc("/api/increment/contacted/{id}", IncrementContacted(client)).Methods("PUT")
+
+
 
 	
 	// Start the HTTP server
@@ -154,6 +179,166 @@ func main() {
 	if err != nil {
 		
 		log.Fatal(err)
+	}
+}
+
+func ListHistory(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("history")
+		// oid, err := primitive.ObjectIDFromHex(id)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []History
+		for cursor.Next(context.Background()) {
+			var item History
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+	}
+}
+
+func ListConnections(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("connections")
+		// oid, err := primitive.ObjectIDFromHex(id)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []Connections
+		for cursor.Next(context.Background()) {
+			var item Connections
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+	}
+}
+
+func IncrementContacted(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	collection := client.Database(Database).Collection("history")
+    filter := bson.M{"userid": id}
+    update := bson.M{"$inc": bson.M{"contacted": 1}}
+
+    _, err := collection.UpdateOne(context.Background(), filter, update)
+    if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	}
+}
+
+func IncrementConnections(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	collection := client.Database(Database).Collection("history")
+    filter := bson.M{"userid": id}
+    update := bson.M{"$inc": bson.M{"connections": 1}}
+
+    _, err := collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+}
+
+
+
+
+func AddHistoryMessage(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+		vars := mux.Vars(r)
+		id := vars["id"]
+		var item HistoryMessage
+
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		
+		// Insert the item into the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("history")
+		filter := bson.M{"userid": id}
+		update :=  bson.M{"$push": bson.M{"messages": item}}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Send a success response
+		w.WriteHeader(http.StatusCreated)
+
 	}
 }
 
@@ -342,6 +527,36 @@ func addItem(client *mongo.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		connections := Connections{
+			UserId: item.UserId,
+			Contacted: 0,
+			Connections: 0,
+		}
+		
+
+		collection = client.Database(Database).Collection("connections")
+		_, err = collection.InsertOne(context.Background(), connections)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		history := History{
+			UserId: item.UserId,
+			Messages: []HistoryMessage{
+				{Message: "Account Created", Timestamp: time.Now()},
+			},
+		}
+
+		collection = client.Database(Database).Collection("history")
+		_, err = collection.InsertOne(context.Background(), history)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+
 		
 		// Send a success response
 		w.WriteHeader(http.StatusCreated)
