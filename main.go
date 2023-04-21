@@ -465,6 +465,24 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.Hand
 
 		fmt.Println(result);
 
+		updateTimeline := HistoryMessage{
+			Title: "Uploaded image",
+			Message: "Upload Image Success",
+			Timestamp: time.Now(),
+
+		}
+
+		collection = client.Database(Database).Collection("history")
+		filter = bson.M{"userid": id}
+		update = bson.M{"$push": bson.M{"messages": updateTimeline}}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+
+
 
 		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
 		if err != nil {
