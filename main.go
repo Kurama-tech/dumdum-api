@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -186,27 +187,26 @@ func main() {
 }
 
 func ListHistory(client *mongo.Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request)  {
+	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		id := vars["id"]
 
 		fmt.Println(id)
 		// Get all items from the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("history")
-		// oid, err := primitive.ObjectIDFromHex(id)
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		filter := bson.M{"userid": id}
+
+		// Sort the messages by timestamp (newest first)
+		sortOptions := options.Find().SetSort(bson.M{"messages.timestamp": -1})
+
+		cursor, err := collection.Find(context.Background(), filter, sortOptions)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer cursor.Close(context.Background())
-		
-		
-		// Decode the cursor results into a slice of Item structs
+
+		// Decode the cursor results into a slice of History structs
 		var items []History
 		for cursor.Next(context.Background()) {
 			var item History
@@ -216,11 +216,17 @@ func ListHistory(client *mongo.Client) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
+			// Sort the messages for this history item by timestamp (newest first)
+			sort.Slice(item.Messages, func(i, j int) bool {
+				return item.Messages[i].Timestamp.After(item.Messages[j].Timestamp)
+			})
+
 			items = append(items, item)
 		}
 
 		fmt.Println(items)
-		
+
 		// Send the list of items as a JSON response
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(items)
