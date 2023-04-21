@@ -45,6 +45,10 @@ type History struct {
     Messages  []HistoryMessage    `bson:"messages"`
 }
 
+type DeleteImage struct {
+	URL string `bson:"url"`
+}
+
 
 type Connections struct {
 	UserId    string    `bson:"userid"`
@@ -172,7 +176,7 @@ func main() {
 	router.HandleFunc("/api/increment/connections/{id}", IncrementConnections(client)).Methods("PUT")
 	router.HandleFunc("/api/increment/contacted/{id}", IncrementContacted(client)).Methods("PUT")
 
-	router.HandleFunc("/api/delete/image/{url}/{id}", DeleteUserImages(minioClient, client)).Methods("DELETE")
+	router.HandleFunc("/api/delete/image/{id}", DeleteUserImages(minioClient, client)).Methods("DELETE")
 
 
 
@@ -354,11 +358,20 @@ func AddHistoryMessage(client *mongo.Client) http.HandlerFunc {
 func DeleteUserImages(minioClient *minio.Client, client *mongo.Client)http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request)  {
 		vars := mux.Vars(r)
-		url := vars["url"]
+		
 		id := vars["id"]
 
+		var item DeleteImage
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		url := item.URL
+
 		// Delete the image from the Minio bucket
-		err := minioClient.RemoveObject("dumdum", url)
+		err = minioClient.RemoveObject("dumdum", url)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to delete image from Minio: %v", err), http.StatusInternalServerError)
 			return
