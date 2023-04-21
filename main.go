@@ -171,6 +171,8 @@ func main() {
 	router.HandleFunc("/api/increment/connections/{id}", IncrementConnections(client)).Methods("PUT")
 	router.HandleFunc("/api/increment/contacted/{id}", IncrementContacted(client)).Methods("PUT")
 
+	router.HandleFunc("/api/delete/image/{url}/{id}", DeleteUserImages(minioClient, client)).Methods("DELETE")
+
 
 
 	
@@ -339,6 +341,39 @@ func AddHistoryMessage(client *mongo.Client) http.HandlerFunc {
 		
 		// Send a success response
 		w.WriteHeader(http.StatusCreated)
+
+	}
+}
+
+func DeleteUserImages(minioClient *minio.Client, client *mongo.Client)http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request)  {
+		vars := mux.Vars(r)
+		url := vars["url"]
+		id := vars["id"]
+
+		// Delete the image from the Minio bucket
+		err := minioClient.RemoveObject("dumdum", url)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to delete image from Minio: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// Update the "images" field of the corresponding MongoDB document
+		collection := client.Database(Database).Collection("users")
+		filter := bson.M{"images": url, "userid": id}
+		update := bson.M{"$pull": bson.M{"images": url}}
+		result, err := collection.UpdateMany(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to update MongoDB document: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if result.ModifiedCount == 0 {
+			http.Error(w, fmt.Sprintf("No MongoDB documents updated"), http.StatusBadRequest)
+			return
+		}
+
+		// Send a success response
+		w.WriteHeader(http.StatusOK)
 
 	}
 }
