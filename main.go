@@ -40,6 +40,22 @@ type HistoryMessage struct {
     Message   string    `bson:"message"`
     Timestamp time.Time `bson:"timestamp"`
 }
+
+type Contacted struct {
+	UserId string `json:"userid"`
+	Name  string `json:"name"`
+}
+
+type Connected struct {
+	UserId string `json:"userid"`
+	Name  string `json:"name"`
+}
+
+type Follow struct {
+	UserId string `json:"userid"`
+	Contacted []Contacted `bson:"contacted"`
+	Connected []Connected `bson:"connected"`
+}
 type History struct {
     UserId    string    `bson:"userid"`
     Messages  []HistoryMessage    `bson:"messages"`
@@ -47,6 +63,12 @@ type History struct {
 
 type DeleteImage struct {
 	URL string `bson:"url"`
+}
+
+type Contact struct{
+	UserId string `bson:"userid"`
+	MyName string `bson:"myname"`
+	Name string `bson:"name"`
 }
 
 
@@ -173,8 +195,7 @@ func main() {
 	router.HandleFunc("/api/list/history/{id}", ListHistory(client)).Methods("GET")
 	router.HandleFunc("/api/list/connections/{id}", ListConnections(client)).Methods("GET")
 
-	router.HandleFunc("/api/increment/connections/{id}", IncrementConnections(client)).Methods("PUT")
-	router.HandleFunc("/api/increment/contacted/{id}", IncrementContacted(client)).Methods("PUT")
+	router.HandleFunc("/api/contact/{id}", IncrementContacted(client)).Methods("PUT")
 
 	router.HandleFunc("/api/delete/image/{id}", DeleteUserImages(minioClient, client)).Methods("DELETE")
 
@@ -296,34 +317,99 @@ func IncrementContacted(client *mongo.Client) http.HandlerFunc {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	collection := client.Database(Database).Collection("history")
-    filter := bson.M{"userid": id}
-    update := bson.M{"$inc": bson.M{"contacted": 1}}
-
-    _, err := collection.UpdateOne(context.Background(), filter, update)
-    if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var item Contact
+	err := json.NewDecoder(r.Body).Decode(&item)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	}
-}
 
-func IncrementConnections(client *mongo.Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request)  {
-	vars := mux.Vars(r)
-	id := vars["id"]
-	collection := client.Database(Database).Collection("history")
-    filter := bson.M{"userid": id}
+	collection := client.Database(Database).Collection("connections")
+    filter := bson.M{"userid": item.UserId}
     update := bson.M{"$inc": bson.M{"connections": 1}}
 
-    _, err := collection.UpdateOne(context.Background(), filter, update)
+    _, err = collection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+
+
+	collection = client.Database(Database).Collection("connections")
+    filter = bson.M{"userid": id}
+    update = bson.M{"$inc": bson.M{"contacted": 1}}
+
+    _, err = collection.UpdateOne(context.Background(), filter, update)
+    if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	updateTimeline := HistoryMessage{
+		Title: "Contacted user",
+		Message: "Contacted user"+ item.Name,
+		Timestamp: time.Now(),
+
+	}
+
+	contacted := Connected{
+		Name: item.Name,
+		UserId: item.UserId,
+	}
+
+	collection = client.Database(Database).Collection("history")
+	filter = bson.M{"userid": id}
+	update = bson.M{"$push": bson.M{"messages": updateTimeline}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	collection = client.Database(Database).Collection("follow")
+	filter = bson.M{"userid": id}
+	update = bson.M{"$push": bson.M{"contacted": contacted}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+
+
+	updateTimeline = HistoryMessage{
+		Title: "New Connection",
+		Message: item.MyName + " Connected with you!",
+		Timestamp: time.Now(),
+
+	}
+
+	connected := Connected{
+		UserId: id,
+		Name: item.MyName,
+	}
+
+	collection = client.Database(Database).Collection("history")
+	filter = bson.M{"userid": item.UserId}
+	update = bson.M{"$push": bson.M{"messages": updateTimeline}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	collection = client.Database(Database).Collection("follow")
+	filter = bson.M{"userid": item.UserId}
+	update = bson.M{"$push": bson.M{"connected": connected}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-}
+	}
 }
 
 
@@ -626,6 +712,18 @@ func addItem(client *mongo.Client) http.HandlerFunc {
 
 		collection = client.Database(Database).Collection("history")
 		_, err = collection.InsertOne(context.Background(), history)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		follow := &Follow{
+			UserId:    item.UserId,
+			Contacted: []Contacted{},
+			Connected: []Connected{},
+		}
+		collection = client.Database(Database).Collection("follow")
+		_, err = collection.InsertOne(context.Background(), follow)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
