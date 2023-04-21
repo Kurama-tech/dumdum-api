@@ -178,6 +178,8 @@ func main() {
 
 	router.HandleFunc("/api/delete/image/{id}", DeleteUserImages(minioClient, client)).Methods("DELETE")
 
+	router.HandleFunc("/api/search/{key}", searchItems(client)).Methods("GET")
+
 
 
 	
@@ -864,16 +866,23 @@ func searchItems(client *mongo.Client) http.HandlerFunc {
 		vars := mux.Vars(r)
 		key := vars["key"]
 		
-		// Search for items in the "items" collection in MongoDB that match the search key
-		collection := client.Database(Database).Collection("products")
-		cursor, err := collection.Find(context.Background(), bson.M{"name": primitive.Regex{Pattern: key, Options: "i"}})
+		// Search for items in the "users" collection in MongoDB that match the search key in either the "name" or "company" field
+		collection := client.Database(Database).Collection("users")
+		filter := bson.M{
+			"$or": []bson.M{
+				{"name": primitive.Regex{Pattern: key, Options: "i"}},
+				{"company": primitive.Regex{Pattern: key, Options: "i"}},
+				{"busniess_category": primitive.Regex{Pattern: key, Options: "i"}},
+			},
+		}
+		cursor, err := collection.Find(context.Background(), filter)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer cursor.Close(context.Background())
 		
-		// Decode the cursor results into a slice of Item structs
+		// Decode the cursor results into a slice of UserGet structs
 		var items []UserGet
 		for cursor.Next(context.Background()) {
 			var item UserGet
@@ -894,3 +903,4 @@ func searchItems(client *mongo.Client) http.HandlerFunc {
 		}
 	}
 }
+
