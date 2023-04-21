@@ -35,6 +35,7 @@ type User struct {
 }
 
 type HistoryMessage struct {
+	Title string `bson:"title"`
     Message   string    `bson:"message"`
     Timestamp time.Time `bson:"timestamp"`
 }
@@ -545,7 +546,7 @@ func addItem(client *mongo.Client) http.HandlerFunc {
 		history := History{
 			UserId: item.UserId,
 			Messages: []HistoryMessage{
-				{Message: "Account Created", Timestamp: time.Now()},
+				{Title: "Account Created", Message: "Hurray! you just crrated an account", Timestamp: time.Now()},
 			},
 		}
 
