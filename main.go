@@ -936,45 +936,73 @@ func getFollowItem(client *mongo.Client) http.HandlerFunc {
 		id := vars["id"]
 
 		fmt.Println(id)
-		// Get all items from the "items" collection in MongoDB
+
+		// Get the item from the "follow" collection in MongoDB that matches the specified user ID
 		collection := client.Database(Database).Collection("follow")
-		// oid, err := primitive.ObjectIDFromHex(id)
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		var item Follow
+		err := collection.FindOne(context.Background(), bson.M{"userid": id}).Decode(&item)
 		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				http.Error(w, "No follow item found for the specified user ID", http.StatusNotFound)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer cursor.Close(context.Background())
-		
-		
-		// Decode the cursor results into a slice of Item structs
-		var items []Follow
-		for cursor.Next(context.Background()) {
-			var item Follow
 
-			err := cursor.Decode(&item)
+		fmt.Println(item)
+
+		// Query the "users" collection to retrieve the user documents for the Contacted and Connected arrays
+		usersColl := client.Database(Database).Collection("users")
+		var contactedUsers []UserGet
+		for _, contacted := range item.Contacted {
+			var contactedUser UserGet
+			err := usersColl.FindOne(context.Background(), bson.M{"userid": contacted.UserId}).Decode(&contactedUser)
 			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					continue
+				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			items = append(items, item)
+			contactedUsers = append(contactedUsers, contactedUser)
 		}
 
-		fmt.Println(items)
-		
-		// Send the list of items as a JSON response
+		var connectedUsers []UserGet
+		for _, connected := range item.Connected {
+			var connectedUser UserGet
+			err := usersColl.FindOne(context.Background(), bson.M{"userid": connected.UserId}).Decode(&connectedUser)
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					continue
+				}
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			connectedUsers = append(connectedUsers, connectedUser)
+		}
+
+		// Send the item as a JSON response with the retrieved user documents included
+		itemWithUsers := struct {
+			UserId     string     `json:"userid"`
+			Contacted  []User     `json:"contacted"`
+			Connected  []User     `json:"connected"`
+		}{
+			UserId:     item.UserId,
+			Contacted:  contactedUsers,
+			Connected:  connectedUsers,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(items)
+		err = json.NewEncoder(w).Encode(itemWithUsers)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 }
+
+
 
 // getItems retrieves all items from the "items" collection in MongoDB
 func getItem(client *mongo.Client) http.HandlerFunc {
