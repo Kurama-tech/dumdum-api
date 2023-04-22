@@ -28,6 +28,7 @@ func main() {
 	usersCollection := client.Database("jwc").Collection("users")
 	connectionsCollection := client.Database("jwc").Collection("connections")
 	historyCollection := client.Database("jwc").Collection("history")
+	followCollection := client.Database("jwc").Collection("follow")
 
 	// Create unique index on userid field
 	indexModel := mongo.IndexModel{
@@ -47,6 +48,12 @@ func main() {
 	fmt.Println("Created index:", indexName)
 
 	indexName, err = historyCollection.Indexes().CreateOne(context.Background(), indexModel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Created index:", indexName)
+
+	indexName, err = followCollection.Indexes().CreateOne(context.Background(), indexModel)
 	if err != nil {
 		log.Fatal(err)
 	}

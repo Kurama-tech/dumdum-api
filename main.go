@@ -985,8 +985,8 @@ func getFollowItem(client *mongo.Client) http.HandlerFunc {
 		// Send the item as a JSON response with the retrieved user documents included
 		itemWithUsers := struct {
 			UserId     string     `json:"userid"`
-			Contacted  []User     `json:"contacted"`
-			Connected  []User     `json:"connected"`
+			Contacted  []UserGet     `json:"contacted"`
+			Connected  []UserGet     `json:"connected"`
 		}{
 			UserId:     item.UserId,
 			Contacted:  contactedUsers,
