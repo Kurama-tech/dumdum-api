@@ -201,6 +201,8 @@ func main() {
 
 	router.HandleFunc("/api/search/{key}", searchItems(client)).Methods("GET")
 
+	router.HandleFunc("/api/list/follow/{id}", getFollowItem(client)).Methods("GET")
+
 
 
 	
@@ -916,6 +918,53 @@ func getDisabledItems(client *mongo.Client) http.HandlerFunc {
 			}
 			items = append(items, item)
 		}
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func getFollowItem(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("follow")
+		// oid, err := primitive.ObjectIDFromHex(id)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []Follow
+		for cursor.Next(context.Background()) {
+			var item Follow
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
 		
 		// Send the list of items as a JSON response
 		w.Header().Set("Content-Type", "application/json")
