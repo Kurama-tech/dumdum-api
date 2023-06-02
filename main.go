@@ -32,8 +32,8 @@ type User struct {
 	UserId string `json:"userid"`
 	Status string `json:"status"`
 	Location string `json:"location"`
-	Latitude string `json:"latitude"`
-	Longitude string `json:"longitude"`
+	Latitude float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 	BusniessCategory string `json:"busniess_category"`
 	BusniessType string `json:"busniess_type"`
 }
@@ -92,8 +92,8 @@ type UserGet struct {
 	UserId string `json:"userid"`
 	Status string `json:"status"`
 	Location string `json:"location"`
-	Latitude string `json:"latitude"`
-	Longitude string `json:"longitude"`
+	Latitude float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 	BusniessCategory string `json:"busniess_category"`
 	BusniessType string `json:"busniess_type"`
 }
