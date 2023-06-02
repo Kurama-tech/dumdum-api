@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/cors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -157,10 +158,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	minioClient, err := minio.New(minioURL, minioKey, minioSecret, false)
-    if err != nil {
-        log.Fatalln(err)
-    }
+	minioClient, err := minio.New(minioURL, &minio.Options{
+		Creds:  credentials.NewStaticV4(minioKey, minioSecret, ""),
+		Secure: true,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Printf("%#v\n", minioClient)
 	
 	// Create a new router using Gorilla Mux
 	router := mux.NewRouter()
@@ -466,7 +472,8 @@ func DeleteUserImages(minioClient *minio.Client, client *mongo.Client)http.Handl
 		url := item.URL
 
 		// Delete the image from the Minio bucket
-		err = minioClient.RemoveObject("dumdum", url)
+		// Remove the object from Minio.
+		err = minioClient.RemoveObject(context.Background(), "dumdum", url, minio.RemoveObjectOptions{})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to delete image from Minio: %v", err), http.StatusInternalServerError)
 			return
@@ -531,12 +538,12 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client, minioURL 
 
             // Generate a unique file name with the original extension.
             newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
-			newPath := "http://"+minioURL + "/dumdum/" + newFilename
+			newPath := "https://"+minioURL + "/dumdum/" + newFilename
 			ImagePaths = append(ImagePaths, newPath)
 
             // Upload the file to Minio.
-            _, err = minioClient.PutObject("dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
-				ContentType: "image/"+dotRemoved,
+            _, err = minioClient.PutObject(context.Background(), "dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
+				ContentType: "image/" + dotRemoved,
 			})
             if err != nil {
 				fmt.Println(err.Error())
@@ -614,58 +621,56 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client, minioURL 
 
 func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-        // Parse the multipart form.
-        err := r.ParseMultipartForm(32 << 20)
-        if err != nil {
+		// Parse the multipart form.
+		err := r.ParseMultipartForm(32 << 20)
+		if err != nil {
 			fmt.Println(err.Error())
-			fmt.Println("Error is here 1")
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-        // Get the file headers from the form.
-        files := r.MultipartForm.File["files"]
+		// Get the file headers from the form.
+		files := r.MultipartForm.File["files"]
 
-		var ImagePaths []string 
+		var ImagePaths []string
 
-        // Loop through the files and upload them to Minio.
-        for _, fileHeader := range files {
-            // Open the file.
-            file, err := fileHeader.Open()
-            if err != nil {
+		// Loop through the files and upload them to Minio.
+		for _, fileHeader := range files {
+			// Open the file.
+			file, err := fileHeader.Open()
+			if err != nil {
 				fmt.Println(err.Error())
-				fmt.Println("Error is here 2")
-                http.Error(w, err.Error(), http.StatusInternalServerError)
-                return
-            }
-            defer file.Close()
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
 
-            // Get the file name and extension.
-            filename := fileHeader.Filename
-            extension := filepath.Ext(filename)
+			// Get the file name and extension.
+			filename := fileHeader.Filename
+			extension := filepath.Ext(filename)
 
 			dotRemoved := extension[1:]
 
-            // Generate a unique file name with the original extension.
-            newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
-			newPath := "https://"+minioURL + "/dumdum/" + newFilename
+			// Generate a unique file name with the original extension.
+			newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
+			newPath := "https://" + minioURL + "/dumdum/" + newFilename
 			ImagePaths = append(ImagePaths, newPath)
 
-            // Upload the file to Minio.
-            _, err = minioClient.PutObject("dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
-				ContentType: "image/"+dotRemoved,
+			log.Println(ImagePaths)
+
+			// Upload the file to Minio.
+			_, err = minioClient.PutObject(context.Background(), "dumdum", newFilename, file, fileHeader.Size, minio.PutObjectOptions{
+				ContentType: "image/" + dotRemoved,
 			})
-            if err != nil {
+			if err != nil {
 				fmt.Println(err.Error())
-				fmt.Println("Error is here 3")
-                http.Error(w, err.Error(), http.StatusInternalServerError)
-                return
-            }
-        }
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 
 		data, err := json.Marshal(ImagePaths)
 		if err != nil {
-			fmt.Println("Error is here 4")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -673,12 +678,13 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 		// Set the Content-Type header to application/json
 		//w.Header().Set("Content-Type", "application/json")
 		// Write the JSON data to the response
-		
-        // Send a success response.
-        w.WriteHeader(http.StatusOK)
+
+		// Send a success response.
+		w.WriteHeader(http.StatusOK)
 		w.Write(data)
-    }
+	}
 }
+
 
 
 // addItem inserts a new item into the "items" collection in MongoDB
