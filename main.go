@@ -618,6 +618,7 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
         err := r.ParseMultipartForm(32 << 20)
         if err != nil {
 			fmt.Println(err.Error())
+			fmt.Println("Error is here 1")
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
@@ -633,6 +634,7 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
             file, err := fileHeader.Open()
             if err != nil {
 				fmt.Println(err.Error())
+				fmt.Println("Error is here 2")
                 http.Error(w, err.Error(), http.StatusInternalServerError)
                 return
             }
@@ -655,6 +657,7 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 			})
             if err != nil {
 				fmt.Println(err.Error())
+				fmt.Println("Error is here 3")
                 http.Error(w, err.Error(), http.StatusInternalServerError)
                 return
             }
@@ -662,6 +665,7 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 
 		data, err := json.Marshal(ImagePaths)
 		if err != nil {
+			fmt.Println("Error is here 4")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
