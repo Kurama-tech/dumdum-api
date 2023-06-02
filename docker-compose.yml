@@ -1,8 +1,19 @@
 version: "3.9"
 
 services:
-  app:
+  dumdumapi:
     build: .
     restart: always
+    labels:
+      - traefik.frontend.rule=Host:dumdum-api.mamun.cloud
+    networks:
+      - internal
+      - web
     ports:
       - "8002:8002"
+networks:
+  web:
+    external: true
+  internal:
+    external: false
+

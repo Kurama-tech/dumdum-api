@@ -95,7 +95,6 @@ type UserGet struct {
 
 
 const Database = "jwc"
-const minioURL = "167.71.233.124:9000"
 
 func getEnv(Environment string) (string, error) {
 	variable := os.Getenv(Environment)
@@ -134,6 +133,12 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+
+	minioURL, err := getEnv("MINIO_URL")
+	if err != nil {
+		os.Exit(1)
+	}
+
 
 	
 	clientOptions := options.Client().ApplyURI(mongoURL)
@@ -183,7 +188,7 @@ func main() {
 	router.HandleFunc("/api/users/enable/{id}", enableItem(client)).Methods("GET")
 
 	// upload an image/images to minio bucket and get url or list of urls
-	router.HandleFunc("/api/upload", Upload(minioClient)).Methods("POST")
+	router.HandleFunc("/api/upload", Upload(minioClient, minioURL)).Methods("POST")
 	
 	// Define a PUT route to edit an item in a collection
 	router.HandleFunc("/api/users/{id}", editItem(client)).Methods("PUT")
@@ -607,7 +612,7 @@ func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.Hand
 	}
 }
 
-func Upload(minioClient *minio.Client) http.HandlerFunc {
+func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
         // Parse the multipart form.
         err := r.ParseMultipartForm(32 << 20)
@@ -641,7 +646,7 @@ func Upload(minioClient *minio.Client) http.HandlerFunc {
 
             // Generate a unique file name with the original extension.
             newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), extension)
-			newPath := "http://"+minioURL + "/dumdum/" + newFilename
+			newPath := "https://"+minioURL + "/dumdum/" + newFilename
 			ImagePaths = append(ImagePaths, newPath)
 
             // Upload the file to Minio.
@@ -951,6 +956,10 @@ func getFollowItem(client *mongo.Client) http.HandlerFunc {
 		}
 
 		fmt.Println(item)
+
+		if item.Contacted == [] || item.Connected == [] {
+			http.Error(w, "Follow Null", http.StatusNotFound)
+		}
 
 		// Query the "users" collection to retrieve the user documents for the Contacted and Connected arrays
 		usersColl := client.Database(Database).Collection("users")
