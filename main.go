@@ -94,7 +94,7 @@ type UserGet struct {
 }
 
 
-const Database = "jwc"
+const Database = "dumdum"
 
 func getEnv(Environment string) (string, error) {
 	variable := os.Getenv(Environment)

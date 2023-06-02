@@ -25,10 +25,10 @@ func main() {
 	defer client.Disconnect(context.Background())
 
 	// Access users collection
-	usersCollection := client.Database("jwc").Collection("users")
-	connectionsCollection := client.Database("jwc").Collection("connections")
-	historyCollection := client.Database("jwc").Collection("history")
-	followCollection := client.Database("jwc").Collection("follow")
+	usersCollection := client.Database("dumdum").Collection("users")
+	connectionsCollection := client.Database("dumdum").Collection("connections")
+	historyCollection := client.Database("dumdum").Collection("history")
+	followCollection := client.Database("dumdum").Collection("follow")
 
 	// Create unique index on userid field
 	indexModel := mongo.IndexModel{
