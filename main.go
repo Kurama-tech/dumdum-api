@@ -968,7 +968,8 @@ func getFollowItem(client *mongo.Client) http.HandlerFunc {
 		fmt.Println(item)
 
 		if len(item.Contacted) == 0 || len(item.Connected) == 0 {
-			http.Error(w, "Follow Null", http.StatusNotFound)
+			//http.Error(w, "Follow Null", http.StatusNotFound)
+			log.Println("Follow Empty")
 		}
 		
 
