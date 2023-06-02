@@ -193,7 +193,7 @@ func main() {
 	// Define a PUT route to edit an item in a collection
 	router.HandleFunc("/api/users/{id}", editItem(client)).Methods("PUT")
 
-	router.HandleFunc("/api/upload/image/{id}", UploadUserImages(minioClient, client)).Methods("POST")
+	router.HandleFunc("/api/upload/image/{id}", UploadUserImages(minioClient, client, minioURL)).Methods("POST")
 
 	router.HandleFunc("/api/add/history/{id}", AddHistoryMessage(client)).Methods("POST")
 
@@ -492,7 +492,7 @@ func DeleteUserImages(minioClient *minio.Client, client *mongo.Client)http.Handl
 	}
 }
 
-func UploadUserImages(minioClient *minio.Client, client *mongo.Client) http.HandlerFunc {
+func UploadUserImages(minioClient *minio.Client, client *mongo.Client, minioURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request)  {
 
 		vars := mux.Vars(r)
@@ -957,9 +957,10 @@ func getFollowItem(client *mongo.Client) http.HandlerFunc {
 
 		fmt.Println(item)
 
-		if item.Contacted == [] || item.Connected == [] {
+		if len(item.Contacted) == 0 || len(item.Connected) == 0 {
 			http.Error(w, "Follow Null", http.StatusNotFound)
 		}
+		
 
 		// Query the "users" collection to retrieve the user documents for the Contacted and Connected arrays
 		usersColl := client.Database(Database).Collection("users")
