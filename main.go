@@ -51,6 +51,12 @@ type ConversationGet struct {
 	WithUserId string `json:"withuserid"`
 }
 
+type Conversations struct {
+	Conversation ConversationGet `json:"conversation"`
+	ByUser      UserGet             `json:"byuser"`
+	WithUser    UserGet             `json:"withuser"`
+}
+
 type HistoryMessage struct {
 	Title string `bson:"title"`
     Message   string    `bson:"message"`
@@ -322,15 +328,49 @@ func GetConversations(client *mongo.Client) http.HandlerFunc {
 		defer cur.Close(context.Background())
 
 		// Iterate through the result cursor and collect the conversations
-		var conversations []ConversationGet
+		var conversations []Conversations
 		for cur.Next(context.Background()) {
 			var conversation ConversationGet
 			if err := cur.Decode(&conversation); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			conversations = append(conversations, conversation)
+
+			// Retrieve the user information for the "ByUserId" and "WithUserId" values
+			byUserID := conversation.ByUserId
+			withUserID := conversation.WithUserId
+
+			// Retrieve the user objects from the "users" collection
+			usersCollection := client.Database(Database).Collection("users")
+
+			byUser := UserGet{}
+			err = usersCollection.FindOne(context.Background(), bson.M{"userid": byUserID}).Decode(&byUser)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			withUser := UserGet{}
+			err = usersCollection.FindOne(context.Background(), bson.M{"userid": withUserID}).Decode(&withUser)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// Append conversation, byUser, and withUser to the result
+			result := struct {
+				Conversation ConversationGet `json:"conversation"`
+				ByUser      UserGet             `json:"byuser"`
+				WithUser    UserGet             `json:"withuser"`
+			}{
+				Conversation: conversation,
+				ByUser:       byUser,
+				WithUser:     withUser,
+			}
+
+			conversations = append(conversations, result)
 		}
+
 		if err := cur.Err(); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -341,6 +381,7 @@ func GetConversations(client *mongo.Client) http.HandlerFunc {
 		json.NewEncoder(w).Encode(conversations)
 	}
 }
+
 
 func ListConnections(client *mongo.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request)  {
@@ -545,7 +586,7 @@ func StartConversation(client *mongo.Client) http.HandlerFunc {
 		}
 		if count > 0 {
 			// Conversation already exists, return an error
-			http.Error(w, "Conversation already exists", http.StatusBadRequest)
+			http.Error(w, "Conversation already exists", http.StatusFound)
 			return
 		}
 
