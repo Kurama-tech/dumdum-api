@@ -38,6 +38,19 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+type Conversation struct {
+	Started bool `json:"started"`
+	ByUserId string `json:"byuserid"`
+	WithUserId string `json:"withuserid"`
+}
+
+type ConversationGet struct {
+	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
+	Started bool `json:"started"`
+	ByUserId string `json:"byuserid"`
+	WithUserId string `json:"withuserid"`
+}
+
 type HistoryMessage struct {
 	Title string `bson:"title"`
     Message   string    `bson:"message"`
@@ -218,6 +231,10 @@ func main() {
 
 	router.HandleFunc("/api/list/follow/{id}", getFollowItem(client)).Methods("GET")
 
+	router.HandleFunc("/api/conversation/start", StartConversation(client)).Methods("POST")
+
+	router.HandleFunc("/api/conversation/list/{id}", GetConversations(client)).Methods("GET")
+
 
 
 	
@@ -279,6 +296,49 @@ func ListHistory(client *mongo.Client) http.HandlerFunc {
 			return
 		}
 
+	}
+}
+
+func GetConversations(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		// Define the filter to match conversations where the id matches either ByUserId or WithUserId
+		filter := bson.M{
+			"$or": []bson.M{
+				{"byuserid": id},
+				{"withuserid": id},
+			},
+		}
+
+		// Retrieve the conversations from the "conversation" collection in MongoDB
+		collection := client.Database(Database).Collection("conversation")
+		cur, err := collection.Find(context.Background(), filter)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cur.Close(context.Background())
+
+		// Iterate through the result cursor and collect the conversations
+		var conversations []ConversationGet
+		for cur.Next(context.Background()) {
+			var conversation ConversationGet
+			if err := cur.Decode(&conversation); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			conversations = append(conversations, conversation)
+		}
+		if err := cur.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Send the conversations as JSON response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(conversations)
 	}
 }
 
@@ -457,6 +517,47 @@ func AddHistoryMessage(client *mongo.Client) http.HandlerFunc {
 		// Send a success response
 		w.WriteHeader(http.StatusCreated)
 
+	}
+}
+
+func StartConversation(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var item Conversation
+
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Check if a conversation with the same ByUserId and WithUserId exists
+		collection := client.Database(Database).Collection("conversation")
+		filter := bson.M{
+			"$or": []bson.M{
+				{"byuserid": item.ByUserId, "withuserid": item.WithUserId},
+				{"byuserid": item.WithUserId, "withuserid": item.ByUserId},
+			},
+		}
+		count, err := collection.CountDocuments(context.Background(), filter)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if count > 0 {
+			// Conversation already exists, return an error
+			http.Error(w, "Conversation already exists", http.StatusBadRequest)
+			return
+		}
+
+		// Insert the item into the "conversation" collection in MongoDB
+		_, err = collection.InsertOne(context.Background(), item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Send a success response
+		w.WriteHeader(http.StatusCreated)
 	}
 }
 
