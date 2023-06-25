@@ -55,6 +55,7 @@ type Conversations struct {
 	Conversation ConversationGet `json:"conversation"`
 	ByUser      UserGet             `json:"byuser"`
 	WithUser    UserGet             `json:"withuser"`
+	DisplayUser UserGet				`json:"displayuser"`
 }
 
 type HistoryMessage struct {
@@ -357,15 +358,20 @@ func GetConversations(client *mongo.Client) http.HandlerFunc {
 				return
 			}
 
+			displayUser := UserGet{}
+			if(id == byUser.UserId){
+				displayUser = withUser
+			}else {
+				displayUser = byUser
+			}
+
 			// Append conversation, byUser, and withUser to the result
-			result := struct {
-				Conversation ConversationGet `json:"conversation"`
-				ByUser      UserGet             `json:"byuser"`
-				WithUser    UserGet             `json:"withuser"`
-			}{
+			result := Conversations{
 				Conversation: conversation,
 				ByUser:       byUser,
 				WithUser:     withUser,
+				DisplayUser: displayUser,
+				
 			}
 
 			conversations = append(conversations, result)
