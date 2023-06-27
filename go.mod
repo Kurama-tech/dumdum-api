@@ -3,9 +3,8 @@ module github.com/Kurama-tech/dumdum-api
 go 1.19
 
 require (
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gorilla/mux v1.8.0
-	github.com/minio/minio-go v6.0.14+incompatible
+	github.com/graarh/golang-socketio v0.0.0-20170510162725-2c44953b9b5f
 	github.com/rs/cors v1.8.3
 	go.mongodb.org/mongo-driver v1.11.4
 )
@@ -13,6 +12,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
@@ -25,11 +25,9 @@ require (
 )
 
 require (
-	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/minio/minio-go/v7 v7.0.56
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

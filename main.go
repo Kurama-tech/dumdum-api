@@ -38,6 +38,8 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+
+
 type Conversation struct {
 	Started bool `json:"started"`
 	ByUserId string `json:"byuserid"`

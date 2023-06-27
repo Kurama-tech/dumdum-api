@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  jwcfrontend:
+    build: .
+    restart: always
+    labels:
+      - traefik.frontend.rule=Host:dumdumsocket-api.mamun.cloud
+    networks:
+     - internal
+     - web
+    ports:
+      - "3000:3000"
+networks:
+ web:
+   external: true
+ internal:
+   external: false
