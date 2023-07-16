@@ -43,6 +43,12 @@ async function run() {
 io.on('connection', (socket) => {
   console.log('A user connected', socket.id);
 
+
+  socket.on("leave", (roomID) => {
+    console.log(`User Left Room: ${roomID}`);
+    socket.leave(roomID);
+  })
+
   // Handle user join events
   socket.on('join', (roomId) => {
     console.log(`User joined room ${roomId}`);
@@ -69,23 +75,35 @@ io.on('connection', (socket) => {
 
     // Handle incoming messages
     socket.on('outgoing', (message) => {
-      console.log('Received message:', message);
-
-      // Broadcast the message to the other users in the room
-      io.to(roomId).emit('incoming', message);
-
-      // Update the room document with the new message
-      collection.updateOne(
-        { roomID: roomId },
-        { $push: { messages: message } }
-      )
-        .then(() => {
-          console.log('Room document updated with new message:', message);
-        })
-        .catch((err) => {
-          console.error('Failed to update room:', err);
-        });
-    });
+        console.log('Received message:', message);
+  
+        // Check if the message with the same ID already exists
+        collection.findOne({ roomID: roomId, 'messages.id': message.id })
+          .then((existingMessage) => {
+            if (existingMessage) {
+              console.log('Message with the same ID already exists. Ignoring.');
+              return;
+            }
+  
+            // Broadcast the message to the other users in the room
+            io.to(roomId).emit('incoming', message);
+  
+            // Update the room document with the new message
+            collection.updateOne(
+              { roomID: roomId },
+              { $push: { messages: message } }
+            )
+              .then(() => {
+                console.log('Room document updated with new message:', message);
+              })
+              .catch((err) => {
+                console.error('Failed to update room:', err);
+              });
+          })
+          .catch((err) => {
+            console.error('Failed to check existing message:', err);
+          });
+      });
   });
 
   // Handle user disconnect events

@@ -38,6 +38,27 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+type Requirements struct {
+	Title string `json:"title"`
+	Description string `json:"description"`
+	Priority string `json:"priority"`
+	Status string `json:"status"`
+	UserId string `json:"userid"`
+	Remarks string `json:"remarks"`
+	Timestamp time.Time `bson:"timestamp"`
+}
+
+type RequirementsGet struct {
+	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
+	Title string `json:"title"`
+	Description string `json:"description"`
+	Priority string `json:"priority"`
+	Status string `json:"status"`
+	UserId string `json:"userid"`
+	Remarks string `json:"remarks"`
+	Timestamp time.Time `bson:"timestamp"`
+}
+
 
 
 type Conversation struct {
@@ -243,6 +264,18 @@ func main() {
 	router.HandleFunc("/api/conversation/start", StartConversation(client)).Methods("POST")
 
 	router.HandleFunc("/api/conversation/list/{id}", GetConversations(client)).Methods("GET")
+
+	router.HandleFunc("/api/requirements/list/{id}", getRequirement(client)).Methods("GET")
+
+	router.HandleFunc("/api/requirements", getRequirements(client)).Methods("GET")
+
+	router.HandleFunc("/api/requirements", addRequirement(client)).Methods("POST")
+
+	router.HandleFunc("/api/requirements/close/{id}", closeRequirement(client)).Methods("POST")
+
+	router.HandleFunc("/api/requirements/update/{id}", editRequirement(client)).Methods("PUT")
+
+
 
 
 
@@ -839,6 +872,30 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 	}
 }
 
+// addItem inserts a new item into the "items" collection in MongoDB
+func addRequirement(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body into an Item struct
+		var item Requirements
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		
+		// Insert the item into the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("requirements")
+		_, err = collection.InsertOne(context.Background(), item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Send a success response
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
 
 
 // addItem inserts a new item into the "items" collection in MongoDB
@@ -933,6 +990,49 @@ func deleteItem(client *mongo.Client) http.HandlerFunc {
 }
 
 // editItem updates an item in the "items" collection in MongoDB
+func editRequirement(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the name parameter from the request URL
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Parse the request body into an Item struct
+		var item RequirementsGet
+		err = json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		fmt.Println(item)
+
+		// tables := item.TableAttached
+		
+		// Update the item in the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("requirements")
+
+		filter := bson.M{"_id": oid}
+		update := bson.M{"$set": item}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Send a success response
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// editItem updates an item in the "items" collection in MongoDB
 func editItem(client *mongo.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the name parameter from the request URL
@@ -1000,6 +1100,36 @@ func disableItem(client *mongo.Client) http.HandlerFunc {
 	}
 }
 
+func closeRequirement(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the name parameter from the request URL
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		
+		// Update the item in the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("requirements")
+		filter := bson.M{"_id": oid}
+		update := bson.M{"$set": bson.M{"status": "closed"}}
+		_, err = collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Send a success response
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func enableItem(client *mongo.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the name parameter from the request URL
@@ -1027,6 +1157,40 @@ func enableItem(client *mongo.Client) http.HandlerFunc {
 		
 		// Send a success response
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// getItems retrieves all items from the "items" collection in MongoDB
+func getRequirements(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("requirements")
+		cursor, err := collection.Find(context.Background(), bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []RequirementsGet
+		for cursor.Next(context.Background()) {
+			var item RequirementsGet
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -1206,6 +1370,50 @@ func getItem(client *mongo.Client) http.HandlerFunc {
 		var items []UserGet
 		for cursor.Next(context.Background()) {
 			var item UserGet
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+// getItems retrieves all items from the "items" collection in MongoDB
+func getRequirement(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("requirements")
+		
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []RequirementsGet
+		for cursor.Next(context.Background()) {
+			var item RequirementsGet
 
 			err := cursor.Decode(&item)
 			if err != nil {
