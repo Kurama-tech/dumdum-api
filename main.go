@@ -46,7 +46,7 @@ type Requirements struct {
 	UserId string `json:"userid"`
 	Remarks string `json:"remarks"`
 	Timestamp time.Time `bson:"timestamp"`
-	LastUpdate primitive.Timestamp `json:"lastUpdate"`
+	LastUpdate time.Time `json:"lastUpdate"`
 }
 
 type RequirementsGet struct {
@@ -58,7 +58,7 @@ type RequirementsGet struct {
 	UserId string `json:"userid"`
 	Remarks string `json:"remarks"`
 	Timestamp time.Time `bson:"timestamp"`
-	LastUpdate primitive.Timestamp `json:"lastUpdate"`
+	LastUpdate time.Time `json:"lastUpdate"`
 }
 
 
@@ -886,7 +886,7 @@ func addRequirement(client *mongo.Client) http.HandlerFunc {
 		}
 
 		item.Timestamp = time.Now();
-		item.LastUpdate =  primitive.Timestamp{T:uint32(time.Now().Unix())}
+		item.LastUpdate =  time.Now();
 		
 		// Insert the item into the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("requirements")
@@ -1019,8 +1019,7 @@ func editRequirement(client *mongo.Client) http.HandlerFunc {
 
 		fmt.Println(item)
 
-		item.LastUpdate =  primitive.Timestamp{T:uint32(time.Now().Unix())}
-
+		item.LastUpdate =  time.Now();
 		// tables := item.TableAttached
 		
 		// Update the item in the "items" collection in MongoDB
@@ -1125,7 +1124,7 @@ func closeRequirement(client *mongo.Client) http.HandlerFunc {
 		// Update the item in the "items" collection in MongoDB
 		collection := client.Database(Database).Collection("requirements")
 		filter := bson.M{"_id": oid}
-		update := bson.M{"$set": bson.M{"status": "closed", "lastUpdate": primitive.Timestamp{T:uint32(time.Now().Unix())}}}
+		update := bson.M{"$set": bson.M{"status": "closed", "lastUpdate": time.Now()}}
 		_, err = collection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
