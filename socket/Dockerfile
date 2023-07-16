@@ -19,6 +19,8 @@ RUN npm install -g pm2
 RUN chown -R 1001:0 /app
 USER 1001
 
+#RUN npm run build
+
 # Expose the server on port 80
 EXPOSE 3000
 
