@@ -29,6 +29,7 @@ func main() {
 	connectionsCollection := client.Database("dumdum").Collection("connections")
 	historyCollection := client.Database("dumdum").Collection("history")
 	followCollection := client.Database("dumdum").Collection("follow")
+	devicesCollection := client.Database("dumdum").Collection("devices")
 
 	// Create unique index on userid field
 	indexModel := mongo.IndexModel{
@@ -54,6 +55,12 @@ func main() {
 	fmt.Println("Created index:", indexName)
 
 	indexName, err = followCollection.Indexes().CreateOne(context.Background(), indexModel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Created index:", indexName)
+
+	indexName, err = devicesCollection.Indexes().CreateOne(context.Background(), indexModel)
 	if err != nil {
 		log.Fatal(err)
 	}

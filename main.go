@@ -38,6 +38,17 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+type UsersDevices struct {
+	UserId string `json:"userid"`
+	DeviceId string `json:"deviceid"`
+}
+
+type UsersDevicesGet struct {
+	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
+	UserId string `json:"userid"`
+	DeviceId string `json:"deviceid"`
+}
+
 type Requirements struct {
 	Title string `json:"title"`
 	Description string `json:"description"`
@@ -276,6 +287,10 @@ func main() {
 	router.HandleFunc("/api/requirements/close/{id}", closeRequirement(client)).Methods("POST")
 
 	router.HandleFunc("/api/requirements/update/{id}", editRequirement(client)).Methods("PUT")
+
+	router.HandleFunc("/api/devices/add", addDevice(client)).Methods("POST")
+	
+	router.HandleFunc("/api/devices/list/{id}", getDevice(client)).Methods("GET")
 
 
 
@@ -901,6 +916,42 @@ func addRequirement(client *mongo.Client) http.HandlerFunc {
 	}
 }
 
+func addDevice(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body into a UsersDevices struct
+		var item UsersDevices
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Define a filter to find the existing document based on the UserId field
+		filter := bson.M{"userid": item.UserId}
+
+		// Define an update operation to either update the existing document or insert a new one
+		update := bson.M{"$set": item}
+
+		// Insert the item into the "devices" collection in MongoDB, but update if it already exists
+		collection := client.Database(Database).Collection("devices")
+		result, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Check if an update occurred (document already existed) or an insert occurred (new document)
+		if result.UpsertedCount > 0 {
+			// A new document was inserted
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			// The document was updated
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+}
+
+
 
 
 // addItem inserts a new item into the "items" collection in MongoDB
@@ -1420,6 +1471,50 @@ func getRequirement(client *mongo.Client) http.HandlerFunc {
 		var items []RequirementsGet
 		for cursor.Next(context.Background()) {
 			var item RequirementsGet
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+
+func getDevice(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("devices")
+		
+		cursor, err := collection.Find(context.Background(), bson.M{"userid": id})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []UsersDevicesGet
+		for cursor.Next(context.Background()) {
+			var item UsersDevicesGet
 
 			err := cursor.Decode(&item)
 			if err != nil {
