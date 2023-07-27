@@ -34,6 +34,7 @@ type User struct {
 	Contact string `json:"contact"`
 	UserId string `json:"userid"`
 	Status string `json:"status"`
+	GovId  string  `json:"govid"`
 	Location string `json:"location"`
 	Latitude float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
@@ -150,6 +151,7 @@ type UserGet struct {
 	Contact string `json:"contact"`
 	UserId string `json:"userid"`
 	Status string `json:"status"`
+	GovId  string  `json:"govid"`
 	Location string `json:"location"`
 	Latitude float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
