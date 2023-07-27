@@ -12,6 +12,8 @@ import (
 	"sort"
 	"time"
 
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
 	"github.com/gorilla/mux"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -20,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/api/option"
 )
 
 type User struct {
@@ -227,6 +230,17 @@ func main() {
 	}
 
 	log.Printf("%#v\n", minioClient)
+
+	opt := option.WithCredentialsFile("service-account.json")
+    app, err := firebase.NewApp(context.Background(), nil, opt)
+    if err != nil {
+        log.Fatalf("Error initializing Firebase app: %v\n", err)
+    }
+
+    FCMclient, err := app.Messaging(context.Background())
+    if err != nil {
+        log.Fatalf("Error initializing Firebase Messaging client: %v\n", err)
+    }
 	
 	// Create a new router using Gorilla Mux
 	router := mux.NewRouter()
@@ -282,7 +296,7 @@ func main() {
 
 	router.HandleFunc("/api/requirements", getRequirements(client)).Methods("GET")
 
-	router.HandleFunc("/api/requirements", addRequirement(client)).Methods("POST")
+	router.HandleFunc("/api/requirements", addRequirement(client, FCMclient)).Methods("POST")
 
 	router.HandleFunc("/api/requirements/close/{id}", closeRequirement(client)).Methods("POST")
 
@@ -890,7 +904,7 @@ func Upload(minioClient *minio.Client, minioURL string) http.HandlerFunc {
 }
 
 // addItem inserts a new item into the "items" collection in MongoDB
-func addRequirement(client *mongo.Client) http.HandlerFunc {
+func addRequirement(client *mongo.Client, FcmClient *messaging.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the request body into an Item struct
 		var item Requirements
@@ -910,6 +924,31 @@ func addRequirement(client *mongo.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		collection = client.Database(Database).Collection("devices")
+		filter := bson.M{"userid": item.UserId}
+		var userDevice UsersDevicesGet
+		err = collection.FindOne(context.Background(), filter).Decode(&userDevice)
+		if err != nil {
+			log.Fatalf("Error finding user device: %v\n", err)
+		}
+
+		// Notification payload
+		message := &messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Requirement Created",
+				Body:  "Thanks For Creating a Requirement!",
+			},
+			Token: userDevice.DeviceId, // Replace with the FCM token of the specific device you want to send the notification to
+		}
+	
+		// Send the notification
+		_, err = FcmClient.Send(context.Background(), message)
+		if err != nil {
+			log.Fatalf("Error sending message: %v\n", err)
+		}
+	
+		log.Println("Notification sent successfully.")
 		
 		// Send a success response
 		w.WriteHeader(http.StatusCreated)
