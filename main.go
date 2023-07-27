@@ -1473,7 +1473,9 @@ func searchItems(client *mongo.Client) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			items = append(items, item)
+			if item.BusniessType != "Individual" {
+				items = append(items, item)
+			}
 		}
 		
 		// Send the list of matching items as a JSON response
