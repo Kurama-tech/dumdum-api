@@ -267,7 +267,7 @@ func main() {
 	router.HandleFunc("/api/users/disable/{id}", disableItem(client)).Methods("DELETE")
 
 	// enable a user based on id
-	router.HandleFunc("/api/users/enable/{id}", enableItem(client)).Methods("GET")
+	router.HandleFunc("/api/users/enable/{id}/{userid}", enableItem(client, FCMclient)).Methods("GET")
 
 	// upload an image/images to minio bucket and get url or list of urls
 	router.HandleFunc("/api/upload", Upload(minioClient, minioURL)).Methods("POST")
@@ -300,9 +300,9 @@ func main() {
 
 	router.HandleFunc("/api/requirements", addRequirement(client, FCMclient)).Methods("POST")
 
-	router.HandleFunc("/api/requirements/close/{id}", closeRequirement(client)).Methods("POST")
+	router.HandleFunc("/api/requirements/close/{id}/{userid}", closeRequirement(client, FCMclient)).Methods("POST")
 
-	router.HandleFunc("/api/requirements/update/{id}", editRequirement(client)).Methods("PUT")
+	router.HandleFunc("/api/requirements/update/{id}", editRequirement(client, FCMclient)).Methods("PUT")
 
 	router.HandleFunc("/api/devices/add", addDevice(client)).Methods("POST")
 	
@@ -1087,7 +1087,7 @@ func deleteItem(client *mongo.Client) http.HandlerFunc {
 }
 
 // editItem updates an item in the "items" collection in MongoDB
-func editRequirement(client *mongo.Client) http.HandlerFunc {
+func editRequirement(client *mongo.Client, FcmClient *messaging.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the name parameter from the request URL
 		vars := mux.Vars(r)
@@ -1124,6 +1124,32 @@ func editRequirement(client *mongo.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		collection = client.Database(Database).Collection("devices")
+		
+		filter = bson.M{"userid": item.UserId}
+		var userDevice UsersDevicesGet
+		err = collection.FindOne(context.Background(), filter).Decode(&userDevice)
+		if err != nil {
+			log.Fatalf("Error finding user device: %v\n", err)
+		}
+
+		// Notification payload
+		message := &messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Requirement Updated",
+				Body:  "Your Requirement Has been Updated!",
+			},
+			Token: userDevice.DeviceId, // Replace with the FCM token of the specific device you want to send the notification to
+		}
+	
+		// Send the notification
+		_, err = FcmClient.Send(context.Background(), message)
+		if err != nil {
+			log.Fatalf("Error sending message: %v\n", err)
+		}
+	
+		log.Println("Notification sent successfully.")
 		
 		// Send a success response
 		w.WriteHeader(http.StatusOK)
@@ -1198,11 +1224,12 @@ func disableItem(client *mongo.Client) http.HandlerFunc {
 	}
 }
 
-func closeRequirement(client *mongo.Client) http.HandlerFunc {
+func closeRequirement(client *mongo.Client, FcmClient *messaging.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the name parameter from the request URL
 		vars := mux.Vars(r)
 		id := vars["id"]
+		uid := vars["userid"]
 
 		fmt.Println(id)
 
@@ -1222,17 +1249,44 @@ func closeRequirement(client *mongo.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		collection = client.Database(Database).Collection("devices")
+		filter = bson.M{"userid": uid}
+		var userDevice UsersDevicesGet
+		err = collection.FindOne(context.Background(), filter).Decode(&userDevice)
+		if err != nil {
+			log.Fatalf("Error finding user device: %v\n", err)
+		}
+
+		// Notification payload
+		message := &messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Requirement Closed",
+				Body:  "Your Requirement has now been closed!",
+			},
+			Token: userDevice.DeviceId, // Replace with the FCM token of the specific device you want to send the notification to
+		}
+	
+		// Send the notification
+		_, err = FcmClient.Send(context.Background(), message)
+		if err != nil {
+			log.Fatalf("Error sending message: %v\n", err)
+		}
+	
+		log.Println("Notification sent successfully.")
+
 		
 		// Send a success response
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func enableItem(client *mongo.Client) http.HandlerFunc {
+func enableItem(client *mongo.Client, FcmClient *messaging.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the name parameter from the request URL
 		vars := mux.Vars(r)
 		id := vars["id"]
+		uid := vars["userid"]
 
 		fmt.Println(id)
 
@@ -1252,6 +1306,32 @@ func enableItem(client *mongo.Client) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		collection = client.Database(Database).Collection("devices")
+		
+		filter = bson.M{"userid": uid}
+		var userDevice UsersDevicesGet
+		err = collection.FindOne(context.Background(), filter).Decode(&userDevice)
+		if err != nil {
+			log.Fatalf("Error finding user device: %v\n", err)
+		}
+
+		// Notification payload
+		message := &messaging.Message{
+			Notification: &messaging.Notification{
+				Title: "Account Verified",
+				Body:  "Your Account is ready to use!",
+			},
+			Token: userDevice.DeviceId, // Replace with the FCM token of the specific device you want to send the notification to
+		}
+	
+		// Send the notification
+		_, err = FcmClient.Send(context.Background(), message)
+		if err != nil {
+			log.Fatalf("Error sending message: %v\n", err)
+		}
+	
+		log.Println("Notification sent successfully.")
 		
 		// Send a success response
 		w.WriteHeader(http.StatusOK)
