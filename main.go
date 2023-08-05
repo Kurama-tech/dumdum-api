@@ -308,6 +308,8 @@ func main() {
 	
 	router.HandleFunc("/api/devices/list/{id}", getDevice(client)).Methods("GET")
 
+	router.HandleFunc("/api/wall", GetWall(client)).Methods("GET")
+
 
 
 
@@ -372,6 +374,77 @@ func ListHistory(client *mongo.Client) http.HandlerFunc {
 		}
 
 	}
+}
+
+func GetWall(client *mongo.Client)http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		collection := client.Database(Database).Collection("connections")
+		cursor, err := collection.Find(context.Background(), bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []Connections
+		for cursor.Next(context.Background()) {
+			var item Connections
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		topConnections := getTopConnections(items)
+		var Result []UserGet
+
+		for _, conn := range topConnections {
+			collection := client.Database(Database).Collection("users")
+			User := UserGet{}
+			err = collection.FindOne(context.Background(), bson.M{"userid": conn.UserId}).Decode(&User)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if (User.BusniessType != "Individual" && User.Status == "active") {
+				Result = append(Result, User)
+			}
+		}
+
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(Result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+
+	}
+}
+
+func getTopConnections(connections []Connections) []Connections {
+	// Sort the connections in descending order based on the number of connections
+	sort.Slice(connections, func(i, j int) bool {
+		return connections[i].Connections > connections[j].Connections
+	})
+
+	// Get the top 10 connections or fewer if there are less than 10 connections in the input
+	topConnectionsCount := len(connections)
+	if topConnectionsCount > 10 {
+		topConnectionsCount = 10
+	}
+
+	// Create a new array to store the top connections
+	topConnections := make([]Connections, topConnectionsCount)
+	copy(topConnections, connections[:topConnectionsCount])
+
+	return topConnections
 }
 
 func GetConversations(client *mongo.Client) http.HandlerFunc {
@@ -1689,7 +1762,7 @@ func searchItems(client *mongo.Client) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			if item.BusniessType != "Individual" {
+			if item.BusniessType != "Individual" && item.Status == "active" {
 				items = append(items, item)
 			}
 		}
