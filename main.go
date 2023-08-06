@@ -42,6 +42,26 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+
+type WallUser struct {
+	Name  string `json:"name"`
+	Company string `json:"company"`
+	Avatar string `json:"avatar"`
+	Images []string `bson:"images" json:"images"`
+	Proprietor string `json:"proprietor"`
+	Contact string `json:"contact"`
+	UserId string `json:"userid"`
+	Status string `json:"status"`
+	GovId  string  `json:"govid"`
+	Location string `json:"location"`
+	Latitude float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	BusniessCategory string `json:"busniess_category"`
+	BusniessType string `json:"busniess_type"`
+	Connections int `bson:"connections"`
+	Score int `bson:"score"`
+}
+
 type UsersDevices struct {
 	UserId string `json:"userid"`
 	DeviceId string `json:"deviceid"`
@@ -401,17 +421,19 @@ func GetWall(client *mongo.Client)http.HandlerFunc {
 		}
 
 		topConnections := getTopConnections(items)
-		var Result []UserGet
+		var Result []WallUser
 
-		for _, conn := range topConnections {
+		for i, conn := range topConnections {
 			collection := client.Database(Database).Collection("users")
-			User := UserGet{}
+			User := WallUser{}
 			err = collection.FindOne(context.Background(), bson.M{"userid": conn.UserId}).Decode(&User)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			if (User.BusniessType != "Individual" && User.Status == "active") {
+				User.Score = i+1
+				User.Connections = conn.Connections;
 				Result = append(Result, User)
 			}
 		}
