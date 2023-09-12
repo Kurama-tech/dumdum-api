@@ -338,6 +338,7 @@ func main() {
 
 	router.HandleFunc("/api/updatePayment", addPayment(client)).Methods("POST")
 
+	router.HandleFunc("/api/payment/list/{id}", getPayment(client)).Methods("GET")
 
 
 
@@ -1774,6 +1775,54 @@ func getDevice(client *mongo.Client) http.HandlerFunc {
 		var items []UsersDevicesGet
 		for cursor.Next(context.Background()) {
 			var item UsersDevicesGet
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		fmt.Println(items)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func getPayment(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("payment")
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		cursor, err := collection.Find(context.Background(), bson.M{"_id": oid})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []Payment
+		for cursor.Next(context.Background()) {
+			var item Payment
 
 			err := cursor.Decode(&item)
 			if err != nil {
