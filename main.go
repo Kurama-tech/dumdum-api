@@ -42,6 +42,17 @@ type User struct {
 	BusniessType string `json:"busniess_type"`
 }
 
+type CapturedPayment struct {
+	UserId string `json:"userid"`
+	Pid string `json:"pid"`
+	Status string `json:"status"`
+	ClientSecret string `json:"clientsecret"`
+	Name  string `json:"name"`
+	Company string `json:"company"`
+	Contact string `json:"contact"`
+	CapturedTimestamp time.Time `bson:"timestamp"`
+}
+
 
 type WallUser struct {
 	Name  string `json:"name"`
@@ -339,6 +350,10 @@ func main() {
 	router.HandleFunc("/api/updatePayment", addPayment(client)).Methods("POST")
 
 	router.HandleFunc("/api/payment/list/{id}", getPayment(client)).Methods("GET")
+
+	router.HandleFunc("/api/capturePayment", capturePayment(client)).Methods("POST")
+
+	router.HandleFunc("/api/findpayment/{id}", getCapturedPayments(client)).Methods("GET")
 
 
 
@@ -1096,6 +1111,42 @@ func addDevice(client *mongo.Client) http.HandlerFunc {
 	}
 }
 
+func capturePayment(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body into a UsersDevices struct
+		var item CapturedPayment
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		item.CapturedTimestamp = time.Now()
+
+		// Define a filter to find the existing document based on the UserId field
+		filter := bson.M{"userid": item.UserId}
+
+		// Define an update operation to either update the existing document or insert a new one
+		update := bson.M{"$set": item}
+
+		// Insert the item into the "devices" collection in MongoDB, but update if it already exists
+		collection := client.Database(Database).Collection("capturedpayments")
+		result, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Check if an update occurred (document already existed) or an insert occurred (new document)
+		if result.UpsertedCount > 0 {
+			// A new document was inserted
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			// The document was updated
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+}
+
 func addPayment(client *mongo.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the request body into a UsersDevices struct
@@ -1794,6 +1845,49 @@ func getDevice(client *mongo.Client) http.HandlerFunc {
 		// Send the list of items as a JSON response
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(items)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func getCapturedPayments(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		fmt.Println(id)
+		// Get all items from the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("capturedpayments")
+		var result CapturedPayment
+		err := collection.FindOne(context.Background(), bson.M{"userid": id}).Decode(&result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		/* defer cursor.Close(context.Background())
+		
+		
+		// Decode the cursor results into a slice of Item structs
+		var items []UsersDevicesGet
+		for cursor.Next(context.Background()) {
+			var item UsersDevicesGet
+
+			err := cursor.Decode(&item)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		} */
+
+		fmt.Println(result)
+		
+		// Send the list of items as a JSON response
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(result)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
