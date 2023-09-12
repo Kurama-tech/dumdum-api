@@ -40,6 +40,7 @@ type User struct {
 	Longitude float64 `json:"longitude"`
 	BusniessCategory string `json:"busniess_category"`
 	BusniessType string `json:"busniess_type"`
+	PaymentStatus string `json:"paymentstatus"`
 }
 
 type CapturedPayment struct {
@@ -51,6 +52,7 @@ type CapturedPayment struct {
 	Company string `json:"company"`
 	Contact string `json:"contact"`
 	CapturedTimestamp time.Time `bson:"timestamp"`
+	Expiry time.Time `bson:"expiry"`
 }
 
 
@@ -194,6 +196,7 @@ type UserGet struct {
 	Longitude float64 `json:"longitude"`
 	BusniessCategory string `json:"busniess_category"`
 	BusniessType string `json:"busniess_type"`
+	PaymentStatus string `json:"paymentstatus"`
 }
 
 
@@ -305,6 +308,8 @@ func main() {
 
 	// enable a user based on id
 	router.HandleFunc("/api/users/enable/{id}/{userid}", enableItem(client, FCMclient)).Methods("GET")
+
+	router.HandleFunc("/api/users/recordpayment/{userid}", setPaymentRecordItem(client)).Methods("PUT")
 
 	// upload an image/images to minio bucket and get url or list of urls
 	router.HandleFunc("/api/upload", Upload(minioClient, minioURL)).Methods("POST")
@@ -1121,6 +1126,7 @@ func capturePayment(client *mongo.Client) http.HandlerFunc {
 			return
 		}
 		item.CapturedTimestamp = time.Now()
+		item.Expiry = time.Now().AddDate(1,0,0)
 
 		// Define a filter to find the existing document based on the UserId field
 		filter := bson.M{"userid": item.UserId}
@@ -1527,6 +1533,27 @@ func enableItem(client *mongo.Client, FcmClient *messaging.Client) http.HandlerF
 		}
 	
 		log.Println("Notification sent successfully.")
+		
+		// Send a success response
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func setPaymentRecordItem(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the name parameter from the request URL
+		vars := mux.Vars(r)
+		uid := vars["userid"]
+
+		// Update the item in the "items" collection in MongoDB
+		collection := client.Database(Database).Collection("users")
+		filter := bson.M{"userid": uid}
+		update := bson.M{"$set": bson.M{"paymentstatus": "recieved"}}
+		_, err := collection.UpdateOne(context.Background(), filter, update)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		
 		// Send a success response
 		w.WriteHeader(http.StatusOK)
