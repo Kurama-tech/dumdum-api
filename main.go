@@ -104,6 +104,12 @@ type Conversation struct {
 	WithUserId string `json:"withuserid"`
 }
 
+type Payment struct {
+	ID      primitive.ObjectID `bson:"_id" json:"id,omitempty"`
+	Oldprice int `json:"oldprice"`
+	Newprice int `json:"newprice"`
+}
+
 type ConversationGet struct {
 	ID    primitive.ObjectID `bson:"_id" json:"id,omitempty"`
 	Started bool `json:"started"`
@@ -329,6 +335,8 @@ func main() {
 	router.HandleFunc("/api/devices/list/{id}", getDevice(client)).Methods("GET")
 
 	router.HandleFunc("/api/wall", GetWall(client)).Methods("GET")
+
+	router.HandleFunc("/api/updatePayment", addPayment(client)).Methods("POST")
 
 
 
@@ -1070,6 +1078,41 @@ func addDevice(client *mongo.Client) http.HandlerFunc {
 
 		// Insert the item into the "devices" collection in MongoDB, but update if it already exists
 		collection := client.Database(Database).Collection("devices")
+		result, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Check if an update occurred (document already existed) or an insert occurred (new document)
+		if result.UpsertedCount > 0 {
+			// A new document was inserted
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			// The document was updated
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+}
+
+func addPayment(client *mongo.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body into a UsersDevices struct
+		var item Payment
+		err := json.NewDecoder(r.Body).Decode(&item)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Define a filter to find the existing document based on the UserId field
+		filter := bson.M{"uid": item.ID}
+
+		// Define an update operation to either update the existing document or insert a new one
+		update := bson.M{"$set": item}
+
+		// Insert the item into the "devices" collection in MongoDB, but update if it already exists
+		collection := client.Database(Database).Collection("payment")
 		result, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
