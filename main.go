@@ -1106,8 +1106,13 @@ func addPayment(client *mongo.Client) http.HandlerFunc {
 			return
 		}
 
+		/* oid, err := primitive.ObjectIDFromHex(item.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		} */
 		// Define a filter to find the existing document based on the UserId field
-		filter := bson.M{"uid": item.ID}
+		filter := bson.M{"_id": item.ID}
 
 		// Define an update operation to either update the existing document or insert a new one
 		update := bson.M{"$set": item}
