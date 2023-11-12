@@ -5,9 +5,9 @@ services:
     build: .
     restart: always
     labels:
-      - traefik.http.routers.blog.rule=Host(`dumdum-api.mamun.cloud`)
-      - traefik.http.routers.blog.tls=true
-      - traefik.http.routers.blog.tls.certresolver=lets-encrypt
+      - traefik.http.routers.api.rule=Host(`dumdum-api.mamun.cloud`)
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.tls.certresolver=lets-encrypt
       - traefik.port=8002
     networks:
       - internal
