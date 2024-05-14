@@ -366,7 +366,7 @@ func main() {
 	
 	// Start the HTTP server
 	log.Println("Starting HTTP server...")
-	err = http.ListenAndServe(":8002", c.Handler(router))
+	err = http.ListenAndServe(":8003", c.Handler(router))
 	if err != nil {
 		
 		log.Fatal(err)

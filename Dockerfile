@@ -11,7 +11,7 @@ COPY . .
 RUN go build -o app .
 
 # Expose port 8080 for the API server
-EXPOSE 8002
+EXPOSE 8003
 
 # Run the command to start the API server when the container starts
 CMD ["/bin/sh", "./run.sh"]

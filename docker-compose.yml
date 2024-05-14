@@ -8,12 +8,12 @@ services:
       - traefik.http.routers.dumdumapi.rule=Host(`dumdum-api.mamun.app`)
       - traefik.http.routers.dumdumapi.tls=true
       - traefik.http.routers.dumdumapi.tls.certresolver=lets-encrypt
-      - traefik.port=8002
+      - traefik.port=8003
     networks:
       - internal
       - web
     ports:
-      - "8002:8002"
+      - "8003:8003"
 networks:
   web:
     external: true
